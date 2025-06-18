@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Palm Payment System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card border-0 shadow">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </h2>
+                    
+                    <!-- Traditional Login Form -->
+                    <form method="POST" action="{{ url_for('login') }}">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="text-center my-4">
+                        <span class="text-muted">or</span>
+                    </div>
+                    
+                    <!-- Palm Login -->
+                    <div class="text-center">
+                        <button type="button" class="btn btn-success btn-lg w-100" onclick="startPalmLogin()">
+                            <i class="fas fa-hand-paper me-2"></i>Login with Palm Scan
+                        </button>
+                    </div>
+                    
+                    <div id="palmLoginSection" class="mt-4" style="display: none;">
+                        <div class="text-center mb-3">
+                            <h6>Position your palm in front of the camera</h6>
+                            <p class="text-muted small">Make sure your palm is clearly visible and well-lit</p>
+                        </div>
+                        
+                        <video id="palmLoginVideo" class="w-100 rounded mb-3" autoplay playsinline style="max-height: 250px;"></video>
+                        <canvas id="palmLoginCanvas" style="display: none;"></canvas>
+                        
+                        <div class="text-center">
+                            <button type="button" class="btn btn-primary" onclick="capturePalmLogin()">
+                                <i class="fas fa-camera me-2"></i>Capture & Authenticate
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="stopPalmLogin()">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </button>
+                        </div>
+                        
+                        <div id="authenticationStatus" class="mt-3 text-center" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Authenticating...</span>
+                            </div>
+                            <p class="mt-2 mb-0">Authenticating your palm...</p>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <p class="mb-0">Don't have an account?</p>
+                        <a href="{{ url_for('register') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user-plus me-2"></i>Register Here
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let palmLoginStream = null;
+
+function startPalmLogin() {
+    const section = document.getElementById('palmLoginSection');
+    const video = document.getElementById('palmLoginVideo');
+    
+    section.style.display = 'block';
+    
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+            palmLoginStream = stream;
+            video.srcObject = stream;
+        })
+        .catch(function(error) {
+            console.error('Error accessing camera:', error);
+            alert('Unable to access camera. Please check permissions and try again.');
+        });
+}
+
+function capturePalmLogin() {
+    const video = document.getElementById('palmLoginVideo');
+    const canvas = document.getElementById('palmLoginCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusDiv = document.getElementById('authenticationStatus');
+    
+    // Show authentication status
+    statusDiv.style.display = 'block';
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    canvas.toBlob(function(blob) {
+        const formData = new FormData();
+        formData.append('palm_image', blob, 'palm_login.png');
+        
+        fetch('/palm_login', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            statusDiv.style.display = 'none';
+            
+            if (data.success) {
+                // Show success message briefly
+                const successAlert = document.createElement('div');
+                successAlert.className = 'alert alert-success';
+                successAlert.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + data.message;
+                document.querySelector('.card-body').prepend(successAlert);
+                
+                // Redirect after a short delay
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1000);
+            } else {
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                errorAlert.innerHTML = `
+                    <i class="fas fa-exclamation-triangle me-2"></i>${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.card-body').prepend(errorAlert);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusDiv.style.display = 'none';
+            alert('An error occurred during palm authentication. Please try again.');
+        });
+    });
+    
+    stopPalmLogin();
+}
+
+function stopPalmLogin() {
+    if (palmLoginStream) {
+        palmLoginStream.getTracks().forEach(track => track.stop());
+        palmLoginStream = null;
+    }
+    document.getElementById('palmLoginSection').style.display = 'none';
+    document.getElementById('authenticationStatus').style.display = 'none';
+}
+</script>
+{% endblock %}

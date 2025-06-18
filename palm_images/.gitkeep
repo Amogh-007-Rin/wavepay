@@ -1,0 +1,2 @@
+# This file ensures the palm_images directory is created and tracked by git
+# The directory is used to store palm print images for biometric authentication

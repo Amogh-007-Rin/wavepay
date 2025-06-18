@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Palm Payment System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Welcome Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Welcome back, {{ user.username }}!</h1>
+            <p class="text-muted">Manage your wallet and transactions</p>
+        </div>
+    </div>
+
+    <!-- Wallet Balance Card -->
+    <div class="row mb-4">
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-subtitle mb-2 opacity-75">Current Balance</h6>
+                            <h2 class="card-title mb-0">${{ "%.2f"|format(user.wallet_balance) }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-wallet fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-subtitle mb-2 text-muted">Palm Status</h6>
+                            <h5 class="card-title mb-0">
+                                {% if user.is_palm_registered %}
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle me-2"></i>Registered
+                                    </span>
+                                {% else %}
+                                    <span class="text-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>Not Registered
+                                    </span>
+                                {% endif %}
+                            </h5>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-hand-paper fa-2x text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-subtitle mb-2 text-muted">Member Since</h6>
+                            <h6 class="card-title mb-0">{{ user.created_at.strftime('%B %Y') }}</h6>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar fa-2x text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col">
+            <h5 class="mb-3">Quick Actions</h5>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <a href="{{ url_for('deposit') }}" class="btn btn-outline-success w-100 p-3">
+                        <i class="fas fa-plus-circle fa-2x d-block mb-2"></i>
+                        <span>Add Funds</span>
+                    </a>
+                </div>
+                
+                <div class="col-md-3">
+                    <a href="{{ url_for('payment') }}" class="btn btn-outline-primary w-100 p-3">
+                        <i class="fas fa-paper-plane fa-2x d-block mb-2"></i>
+                        <span>Send Payment</span>
+                    </a>
+                </div>
+                
+                <div class="col-md-3">
+                    <a href="{{ url_for('history') }}" class="btn btn-outline-info w-100 p-3">
+                        <i class="fas fa-history fa-2x d-block mb-2"></i>
+                        <span>View History</span>
+                    </a>
+                </div>
+                
+                <div class="col-md-3">
+                    {% if not user.is_palm_registered %}
+                        <a href="{{ url_for('register_palm') }}" class="btn btn-outline-warning w-100 p-3">
+                            <i class="fas fa-hand-paper fa-2x d-block mb-2"></i>
+                            <span>Register Palm</span>
+                        </a>
+                    {% else %}
+                        <button type="button" class="btn btn-outline-secondary w-100 p-3" onclick="startQuickPayment()">
+                            <i class="fas fa-magic fa-2x d-block mb-2"></i>
+                            <span>Quick Pay</span>
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="row">
+        <div class="col">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Transactions</h5>
+                        <a href="{{ url_for('history') }}" class="btn btn-sm btn-outline-primary">
+                            View All <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if transactions %}
+                        <div class="list-group list-group-flush">
+                            {% for transaction in transactions %}
+                                <div class="list-group-item border-0 px-0">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                {% if transaction.transaction_type == 'deposit' %}
+                                                    <div class="rounded-circle bg-success bg-opacity-10 p-2">
+                                                        <i class="fas fa-plus text-success"></i>
+                                                    </div>
+                                                {% elif transaction.transaction_type == 'payment' %}
+                                                    {% if transaction.sender_id == user.id %}
+                                                        <div class="rounded-circle bg-danger bg-opacity-10 p-2">
+                                                            <i class="fas fa-arrow-up text-danger"></i>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="rounded-circle bg-success bg-opacity-10 p-2">
+                                                            <i class="fas fa-arrow-down text-success"></i>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <div class="fw-medium">
+                                                    {% if transaction.transaction_type == 'deposit' %}
+                                                        Wallet Deposit
+                                                    {% elif transaction.transaction_type == 'payment' %}
+                                                        {% if transaction.sender_id == user.id %}
+                                                            Payment to {{ transaction.receiver.username }}
+                                                        {% else %}
+                                                            Payment from {{ transaction.sender.username }}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                                <small class="text-muted">
+                                                    {{ transaction.timestamp.strftime('%B %d, %Y at %I:%M %p') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fw-medium">
+                                                {% if transaction.transaction_type == 'deposit' or (transaction.transaction_type == 'payment' and transaction.receiver_id == user.id) %}
+                                                    <span class="text-success">+${{ "%.2f"|format(transaction.amount) }}</span>
+                                                {% else %}
+                                                    <span class="text-danger">-${{ "%.2f"|format(transaction.amount) }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <small class="text-muted">{{ transaction.status.title() }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">No transactions yet</h6>
+                            <p class="text-muted mb-0">Your transaction history will appear here</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Payment Modal -->
+    <div class="modal fade" id="quickPaymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-magic me-2"></i>Quick Palm Payment
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quickPaymentForm">
+                        <div class="mb-3">
+                            <label for="quickRecipient" class="form-label">Recipient Username</label>
+                            <input type="text" class="form-control" id="quickRecipient" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="quickAmount" class="form-label">Amount ($)</label>
+                            <input type="number" class="form-control" id="quickAmount" min="0.01" step="0.01" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="quickDescription" class="form-label">Description (Optional)</label>
+                            <input type="text" class="form-control" id="quickDescription">
+                        </div>
+                        
+                        <div class="text-center">
+                            <button type="button" class="btn btn-success" onclick="startQuickPalmScan()">
+                                <i class="fas fa-hand-paper me-2"></i>Scan Palm to Pay
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="quickPalmSection" class="mt-4" style="display: none;">
+                        <video id="quickPalmVideo" class="w-100 rounded mb-3" autoplay playsinline style="max-height: 250px;"></video>
+                        <canvas id="quickPalmCanvas" style="display: none;"></canvas>
+                        
+                        <div class="text-center">
+                            <button type="button" class="btn btn-primary" onclick="processQuickPayment()">
+                                <i class="fas fa-camera me-2"></i>Capture & Pay
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="stopQuickPalmScan()">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let quickPalmStream = null;
+
+function startQuickPayment() {
+    const modal = new bootstrap.Modal(document.getElementById('quickPaymentModal'));
+    modal.show();
+}
+
+function startQuickPalmScan() {
+    const recipient = document.getElementById('quickRecipient').value;
+    const amount = document.getElementById('quickAmount').value;
+    
+    if (!recipient || !amount) {
+        alert('Please fill in recipient and amount fields.');
+        return;
+    }
+    
+    const section = document.getElementById('quickPalmSection');
+    const video = document.getElementById('quickPalmVideo');
+    
+    section.style.display = 'block';
+    
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+            quickPalmStream = stream;
+            video.srcObject = stream;
+        })
+        .catch(function(error) {
+            console.error('Error accessing camera:', error);
+            alert('Unable to access camera. Please check permissions.');
+        });
+}
+
+function processQuickPayment() {
+    const video = document.getElementById('quickPalmVideo');
+    const canvas = document.getElementById('quickPalmCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    const recipient = document.getElementById('quickRecipient').value;
+    const amount = document.getElementById('quickAmount').value;
+    const description = document.getElementById('quickDescription').value;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    canvas.toBlob(function(blob) {
+        const formData = new FormData();
+        formData.append('palm_image', blob, 'quick_payment.png');
+        formData.append('recipient', recipient);
+        formData.append('amount', amount);
+        formData.append('description', description);
+        
+        fetch('/palm_payment', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert('Payment failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred during payment processing.');
+        });
+    });
+    
+    stopQuickPalmScan();
+    bootstrap.Modal.getInstance(document.getElementById('quickPaymentModal')).hide();
+}
+
+function stopQuickPalmScan() {
+    if (quickPalmStream) {
+        quickPalmStream.getTracks().forEach(track => track.stop());
+        quickPalmStream = null;
+    }
+    document.getElementById('quickPalmSection').style.display = 'none';
+}
+</script>
+{% endblock %}

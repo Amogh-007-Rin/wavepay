@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Send Payment - Palm Payment System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-paper-plane me-2 text-primary"></i>Send Payment
+                    </h2>
+                    
+                    <!-- Traditional Payment Form -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="mb-3">
+                                <i class="fas fa-keyboard me-2"></i>Manual Payment
+                            </h5>
+                            
+                            <form method="POST" action="{{ url_for('payment') }}">
+                                <div class="mb-3">
+                                    <label for="recipient" class="form-label">Recipient Username</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-user"></i>
+                                        </span>
+                                        <input type="text" class="form-control" id="recipient" name="recipient" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="amount" class="form-label">Amount</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-dollar-sign"></i>
+                                        </span>
+                                        <input type="number" class="form-control" id="amount" name="amount" 
+                                               min="0.01" step="0.01" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="description" class="form-label">Description (Optional)</label>
+                                    <textarea class="form-control" id="description" name="description" 
+                                              rows="2" placeholder="What's this payment for?"></textarea>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-paper-plane me-2"></i>Send Payment
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="mb-3">
+                                <i class="fas fa-hand-paper me-2"></i>Palm Payment
+                            </h5>
+                            
+                            <p class="text-muted mb-4">
+                                Use your palm print for secure, contactless payment authentication.
+                            </p>
+                            
+                            <form id="palmPaymentForm">
+                                <div class="mb-3">
+                                    <label for="palmRecipient" class="form-label">Recipient Username</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-user"></i>
+                                        </span>
+                                        <input type="text" class="form-control" id="palmRecipient" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="palmAmount" class="form-label">Amount</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-dollar-sign"></i>
+                                        </span>
+                                        <input type="number" class="form-control" id="palmAmount" 
+                                               min="0.01" step="0.01" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="palmDescription" class="form-label">Description (Optional)</label>
+                                    <textarea class="form-control" id="palmDescription" 
+                                              rows="2" placeholder="What's this payment for?"></textarea>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="button" class="btn btn-success btn-lg" onclick="startPalmPayment()">
+                                        <i class="fas fa-hand-paper me-2"></i>Pay with Palm Scan
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <div id="palmPaymentSection" class="mt-4" style="display: none;">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Position your palm clearly in front of the camera for authentication.
+                                </div>
+                                
+                                <video id="palmPaymentVideo" class="w-100 rounded mb-3" autoplay playsinline style="max-height: 250px;"></video>
+                                <canvas id="palmPaymentCanvas" style="display: none;"></canvas>
+                                
+                                <div class="text-center">
+                                    <button type="button" class="btn btn-primary" onclick="capturePalmPayment()">
+                                        <i class="fas fa-camera me-2"></i>Capture & Send Payment
+                                    </button>
+                                    <button type="button" class="btn btn-secondary ms-2" onclick="stopPalmPayment()">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </button>
+                                </div>
+                                
+                                <div id="paymentProcessing" class="text-center mt-3" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Processing...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0">Processing your payment...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment Tips -->
+            <div class="card border-0 shadow mt-4">
+                <div class="card-body p-4">
+                    <h5 class="card-title">
+                        <i class="fas fa-lightbulb me-2 text-warning"></i>Payment Tips
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Double-check recipient username before sending
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Payments are processed instantly
+                                </li>
+                                <li class="mb-0">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    All transactions are securely encrypted
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Palm authentication adds extra security
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Transaction history is always available
+                                </li>
+                                <li class="mb-0">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    No fees for peer-to-peer payments
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let palmPaymentStream = null;
+
+function startPalmPayment() {
+    const recipient = document.getElementById('palmRecipient').value;
+    const amount = document.getElementById('palmAmount').value;
+    
+    if (!recipient || !amount) {
+        alert('Please fill in recipient and amount fields.');
+        return;
+    }
+    
+    if (parseFloat(amount) <= 0) {
+        alert('Please enter a valid amount greater than $0.00.');
+        return;
+    }
+    
+    const section = document.getElementById('palmPaymentSection');
+    const video = document.getElementById('palmPaymentVideo');
+    
+    section.style.display = 'block';
+    
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+            palmPaymentStream = stream;
+            video.srcObject = stream;
+        })
+        .catch(function(error) {
+            console.error('Error accessing camera:', error);
+            alert('Unable to access camera. Please check permissions and try again.');
+        });
+}
+
+function capturePalmPayment() {
+    const video = document.getElementById('palmPaymentVideo');
+    const canvas = document.getElementById('palmPaymentCanvas');
+    const ctx = canvas.getContext('2d');
+    const processingDiv = document.getElementById('paymentProcessing');
+    
+    const recipient = document.getElementById('palmRecipient').value;
+    const amount = document.getElementById('palmAmount').value;
+    const description = document.getElementById('palmDescription').value;
+    
+    // Show processing indicator
+    processingDiv.style.display = 'block';
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    canvas.toBlob(function(blob) {
+        const formData = new FormData();
+        formData.append('palm_image', blob, 'palm_payment.png');
+        formData.append('recipient', recipient);
+        formData.append('amount', amount);
+        formData.append('description', description);
+        
+        fetch('/palm_payment', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            processingDiv.style.display = 'none';
+            
+            if (data.success) {
+                // Show success message
+                const successAlert = document.createElement('div');
+                successAlert.className = 'alert alert-success';
+                successAlert.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + data.message;
+                document.querySelector('.card-body').prepend(successAlert);
+                
+                // Clear form
+                document.getElementById('palmPaymentForm').reset();
+                
+                // Redirect to dashboard after a short delay
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 2000);
+            } else {
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                errorAlert.innerHTML = `
+                    <i class="fas fa-exclamation-triangle me-2"></i>${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.card-body').prepend(errorAlert);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            processingDiv.style.display = 'none';
+            alert('An error occurred during payment processing. Please try again.');
+        });
+    });
+    
+    stopPalmPayment();
+}
+
+function stopPalmPayment() {
+    if (palmPaymentStream) {
+        palmPaymentStream.getTracks().forEach(track => track.stop());
+        palmPaymentStream = null;
+    }
+    document.getElementById('palmPaymentSection').style.display = 'none';
+    document.getElementById('paymentProcessing').style.display = 'none';
+}
+
+// Form validation for manual payment
+document.querySelector('form[method="POST"]').addEventListener('submit', function(e) {
+    const amount = parseFloat(document.getElementById('amount').value);
+    const recipient = document.getElementById('recipient').value.trim();
+    
+    if (!recipient) {
+        e.preventDefault();
+        alert('Please enter a recipient username.');
+        return;
+    }
+    
+    if (isNaN(amount) || amount <= 0) {
+        e.preventDefault();
+        alert('Please enter a valid amount greater than $0.00');
+        return;
+    }
+    
+    if (amount > 10000) {
+        e.preventDefault();
+        alert('Maximum payment amount is $10,000.00');
+        return;
+    }
+    
+    // Confirm large payments
+    if (amount > 500) {
+        if (!confirm(`Are you sure you want to send $${amount.toFixed(2)} to ${recipient}?`)) {
+            e.preventDefault();
+            return;
+        }
+    }
+});
+</script>
+{% endblock %}
