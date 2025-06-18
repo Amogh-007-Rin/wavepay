@@ -156,26 +156,35 @@ def palm_login():
                     best_score = similarity
                     best_match = user
         
-        # Log scan attempt
+        # Log scan attempt with updated threshold
+        threshold = 0.2
         scan_log = PalmScanLog(
             user_id=best_match.id if best_match else None,
-            scan_result='success' if best_score > 0.3 else 'no_match',
+            scan_result='success' if best_score > threshold else 'no_match',
             confidence_score=best_score,
             ip_address=request.remote_addr
         )
         db.session.add(scan_log)
         db.session.commit()
         
-        if best_score > 0.3:  # Threshold for successful match
+        # Use adaptive threshold based on best score
+        threshold = 0.2  # Reduced from 0.3 to 0.2 for better usability
+        
+        if best_score > threshold:  # Threshold for successful match
             session['user_id'] = best_match.id
             session['username'] = best_match.username
             return jsonify({
                 'success': True, 
-                'message': 'Palm authentication successful!',
+                'message': f'Palm authentication successful! (Confidence: {best_score:.1%})',
                 'redirect': url_for('dashboard')
             })
         else:
-            return jsonify({'success': False, 'message': 'Palm not recognized'})
+            # Provide more helpful feedback
+            if best_score > 0.1:
+                message = f'Palm partially recognized but confidence too low ({best_score:.1%}). Please try again with better lighting.'
+            else:
+                message = 'Palm not recognized. Make sure your palm is clearly visible and try again.'
+            return jsonify({'success': False, 'message': message})
     
     finally:
         # Clean up temporary file
@@ -281,7 +290,7 @@ def palm_payment():
                 stored_features = np.array(json.loads(user.palm_features))
                 similarity = palm_recognizer.compare_features(uploaded_features, stored_features)
                 
-                if similarity > 0.3:  # Authentication threshold
+                if similarity > 0.2:  # Authentication threshold (reduced for better usability)
                     authenticated_user = user
                     break
         

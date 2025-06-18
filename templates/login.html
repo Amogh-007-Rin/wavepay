@@ -53,21 +53,38 @@
                     </div>
                     
                     <div id="palmLoginSection" class="mt-4" style="display: none;">
-                        <div class="text-center mb-3">
-                            <h6>Position your palm in front of the camera</h6>
-                            <p class="text-muted small">Make sure your palm is clearly visible and well-lit</p>
+                        <div class="alert alert-info mb-3">
+                            <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Palm Scanning Tips</h6>
+                            <ul class="mb-0 small">
+                                <li>Hold your palm 6-8 inches from the camera</li>
+                                <li>Ensure good lighting on your palm</li>
+                                <li>Keep your hand steady when capturing</li>
+                                <li>Show your full palm with fingers spread</li>
+                            </ul>
                         </div>
                         
-                        <video id="palmLoginVideo" class="w-100 rounded mb-3" autoplay playsinline style="max-height: 250px;"></video>
+                        <div class="position-relative">
+                            <video id="palmLoginVideo" class="w-100 rounded mb-3" autoplay playsinline style="max-height: 300px;"></video>
+                            <div class="position-absolute top-50 start-50 translate-middle" style="border: 3px dashed rgba(var(--bs-primary-rgb), 0.5); width: 200px; height: 150px; border-radius: 15px; pointer-events: none;">
+                                <div class="position-absolute top-50 start-50 translate-middle text-primary small">
+                                    <i class="fas fa-hand-paper"></i> Place palm here
+                                </div>
+                            </div>
+                        </div>
                         <canvas id="palmLoginCanvas" style="display: none;"></canvas>
                         
                         <div class="text-center">
-                            <button type="button" class="btn btn-primary" onclick="capturePalmLogin()">
+                            <button type="button" class="btn btn-primary btn-lg" onclick="capturePalmLogin()">
                                 <i class="fas fa-camera me-2"></i>Capture & Authenticate
                             </button>
                             <button type="button" class="btn btn-secondary ms-2" onclick="stopPalmLogin()">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </button>
+                        </div>
+                        
+                        <div id="captureCountdown" class="text-center mt-3" style="display: none;">
+                            <h2 class="text-primary mb-2" id="countdownNumber">3</h2>
+                            <p class="mb-0">Keep your palm steady...</p>
                         </div>
                         
                         <div id="authenticationStatus" class="mt-3 text-center" style="display: none;">
@@ -113,6 +130,31 @@ function startPalmLogin() {
 }
 
 function capturePalmLogin() {
+    const countdownDiv = document.getElementById('captureCountdown');
+    const countdownNumber = document.getElementById('countdownNumber');
+    const captureBtn = document.querySelector('button[onclick="capturePalmLogin()"]');
+    
+    // Disable capture button and show countdown
+    captureBtn.disabled = true;
+    countdownDiv.style.display = 'block';
+    
+    let count = 3;
+    countdownNumber.textContent = count;
+    
+    const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            countdownNumber.textContent = count;
+        } else {
+            clearInterval(countdownInterval);
+            countdownDiv.style.display = 'none';
+            captureBtn.disabled = false;
+            performPalmCapture();
+        }
+    }, 1000);
+}
+
+function performPalmCapture() {
     const video = document.getElementById('palmLoginVideo');
     const canvas = document.getElementById('palmLoginCanvas');
     const ctx = canvas.getContext('2d');
@@ -140,14 +182,14 @@ function capturePalmLogin() {
             if (data.success) {
                 // Show success message briefly
                 const successAlert = document.createElement('div');
-                successAlert.className = 'alert alert-success';
+                successAlert.className = 'alert alert-success alert-dismissible fade show';
                 successAlert.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + data.message;
                 document.querySelector('.card-body').prepend(successAlert);
                 
                 // Redirect after a short delay
                 setTimeout(() => {
                     window.location.href = data.redirect;
-                }, 1000);
+                }, 1500);
             } else {
                 const errorAlert = document.createElement('div');
                 errorAlert.className = 'alert alert-danger alert-dismissible fade show';
@@ -156,12 +198,25 @@ function capturePalmLogin() {
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 document.querySelector('.card-body').prepend(errorAlert);
+                
+                // Auto-dismiss error after 5 seconds
+                setTimeout(() => {
+                    if (errorAlert.parentNode) {
+                        errorAlert.remove();
+                    }
+                }, 5000);
             }
         })
         .catch(error => {
             console.error('Error:', error);
             statusDiv.style.display = 'none';
-            alert('An error occurred during palm authentication. Please try again.');
+            const errorAlert = document.createElement('div');
+            errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+            errorAlert.innerHTML = `
+                <i class="fas fa-exclamation-triangle me-2"></i>Network error occurred. Please try again.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.card-body').prepend(errorAlert);
         });
     });
     

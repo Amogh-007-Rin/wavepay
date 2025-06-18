@@ -12,7 +12,7 @@ class PalmRecognition:
         
     def preprocess_image(self, image_path: str) -> Optional[np.ndarray]:
         """
-        Preprocess palm image for feature extraction
+        Preprocess palm image for feature extraction with improved handling
         """
         try:
             # Read image
@@ -24,17 +24,27 @@ class PalmRecognition:
             # Convert to grayscale
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             
-            # Apply Gaussian blur to reduce noise
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            # Apply bilateral filter to reduce noise while preserving edges
+            filtered = cv2.bilateralFilter(gray, 9, 75, 75)
             
-            # Enhance contrast using CLAHE
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            enhanced = clahe.apply(blurred)
+            # Enhance contrast using adaptive histogram equalization
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(filtered)
             
-            # Resize to standard size for consistency
-            resized = cv2.resize(enhanced, (400, 300))
+            # Apply slight Gaussian blur for smoothing
+            smoothed = cv2.GaussianBlur(enhanced, (3, 3), 0)
             
-            return resized
+            # Resize to larger standard size for better feature detection
+            resized = cv2.resize(smoothed, (640, 480))
+            
+            # Apply sharpening kernel to enhance palm lines
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(resized, -1, kernel)
+            
+            # Blend original and sharpened image
+            final = cv2.addWeighted(resized, 0.7, sharpened, 0.3, 0)
+            
+            return final
             
         except Exception as e:
             logging.error(f"Error preprocessing image {image_path}: {str(e)}")
@@ -90,17 +100,39 @@ class PalmRecognition:
             # Sort matches by distance (lower is better)
             matches = sorted(matches, key=lambda x: x.distance)
             
-            # Calculate similarity score based on good matches
-            good_matches = [m for m in matches if m.distance < 50]  # Distance threshold
+            # Use more lenient distance threshold for better matching
+            good_matches = [m for m in matches if m.distance < 60]  # Increased from 50 to 60
             
-            # Calculate similarity as ratio of good matches to total possible matches
-            max_possible_matches = min(len(features1), len(features2))
-            similarity_score = len(good_matches) / max_possible_matches
+            # Use top 20% of matches for more reliable scoring
+            top_matches = matches[:max(10, len(matches) // 5)]
+            excellent_matches = [m for m in top_matches if m.distance < 45]
             
-            logging.info(f"Feature comparison: {len(good_matches)} good matches out of {len(matches)} total matches")
-            logging.info(f"Similarity score: {similarity_score:.3f}")
+            # Calculate multiple similarity metrics
+            # 1. Ratio of good matches to minimum feature count
+            min_features = min(len(features1), len(features2))
+            basic_score = len(good_matches) / min_features
             
-            return similarity_score
+            # 2. Quality-weighted score based on match distances
+            if len(top_matches) > 0:
+                avg_distance = sum(m.distance for m in top_matches) / len(top_matches)
+                distance_score = max(0, (80 - avg_distance) / 80)  # Normalize distance to 0-1
+            else:
+                distance_score = 0
+            
+            # 3. Excellent matches bonus
+            excellent_ratio = len(excellent_matches) / min(20, min_features)
+            
+            # Combine scores with weights
+            final_score = (basic_score * 0.4) + (distance_score * 0.4) + (excellent_ratio * 0.2)
+            
+            # Cap the score at 1.0
+            final_score = min(1.0, final_score)
+            
+            logging.info(f"Feature comparison: {len(good_matches)} good matches, {len(excellent_matches)} excellent matches out of {len(matches)} total")
+            logging.info(f"Scores - Basic: {basic_score:.3f}, Distance: {distance_score:.3f}, Excellent: {excellent_ratio:.3f}")
+            logging.info(f"Final similarity score: {final_score:.3f}")
+            
+            return final_score
             
         except Exception as e:
             logging.error(f"Error comparing features: {str(e)}")
