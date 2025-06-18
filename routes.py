@@ -315,6 +315,67 @@ def palm_payment():
         if os.path.exists(temp_filepath):
             os.remove(temp_filepath)
 
+@app.route('/set_payment_pin', methods=['GET', 'POST'])
+def set_payment_pin():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        pin = request.form['pin']
+        confirm_pin = request.form['confirm_pin']
+        
+        if pin != confirm_pin:
+            flash('PINs do not match', 'danger')
+            return render_template('set_pin.html')
+        
+        user = User.query.get(session['user_id'])
+        if user.set_payment_pin(pin):
+            db.session.commit()
+            flash('Payment PIN set successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('PIN must be exactly 6 digits', 'danger')
+    
+    return render_template('set_pin.html')
+
+@app.route('/pin_payment', methods=['POST'])
+def pin_payment():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Not authenticated'})
+    
+    recipient_username = request.form.get('recipient')
+    amount = float(request.form.get('amount', 0))
+    description = request.form.get('description', '')
+    pin = request.form.get('pin')
+    
+    if amount <= 0:
+        return jsonify({'success': False, 'message': 'Invalid amount'})
+    
+    if not pin or len(pin) != 6:
+        return jsonify({'success': False, 'message': 'Please enter a 6-digit PIN'})
+    
+    sender = User.query.get(session['user_id'])
+    if not sender.is_pin_set:
+        return jsonify({'success': False, 'message': 'Payment PIN not set. Please set your PIN first.'})
+    
+    if not sender.check_payment_pin(pin):
+        return jsonify({'success': False, 'message': 'Incorrect PIN. Please try again.'})
+    
+    recipient = User.query.filter_by(username=recipient_username).first()
+    if not recipient:
+        return jsonify({'success': False, 'message': 'Recipient not found'})
+    
+    if sender.wallet_balance < amount:
+        return jsonify({'success': False, 'message': 'Insufficient funds'})
+    
+    if wallet_service.transfer_funds(sender, recipient, amount, description):
+        return jsonify({
+            'success': True, 
+            'message': f'Payment of ${amount:.2f} sent to {recipient.username}'
+        })
+    else:
+        return jsonify({'success': False, 'message': 'Payment failed'})
+
 @app.route('/history')
 def history():
     if 'user_id' not in session:

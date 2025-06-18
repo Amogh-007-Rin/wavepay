@@ -9,9 +9,11 @@ class User(db.Model):
     password_hash = db.Column(db.String(256))
     palm_image_path = db.Column(db.String(255))
     palm_features = db.Column(db.Text)  # Store ORB features as JSON string
+    payment_pin_hash = db.Column(db.String(256))  # 6-digit PIN for backup authentication
     wallet_balance = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_palm_registered = db.Column(db.Boolean, default=False)
+    is_pin_set = db.Column(db.Boolean, default=False)
     
     # Relationships
     transactions_sent = db.relationship('Transaction', foreign_keys='Transaction.sender_id', backref='sender', lazy='dynamic')
@@ -22,6 +24,20 @@ class User(db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    def set_payment_pin(self, pin):
+        """Set 6-digit payment PIN"""
+        if len(pin) == 6 and pin.isdigit():
+            self.payment_pin_hash = generate_password_hash(pin)
+            self.is_pin_set = True
+            return True
+        return False
+    
+    def check_payment_pin(self, pin):
+        """Verify 6-digit payment PIN"""
+        if not self.payment_pin_hash:
+            return False
+        return check_password_hash(self.payment_pin_hash, pin)
     
     def add_funds(self, amount):
         self.wallet_balance += amount
