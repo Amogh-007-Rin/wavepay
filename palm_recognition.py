@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 class PalmRecognition:
     def __init__(self):
         """Initialize ORB feature detector for palm recognition"""
-        self.orb = cv2.ORB_create(nfeatures=500)
+        self.orb = cv2.ORB_create(nfeatures=1000, scaleFactor=1.2, nlevels=8)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         
     def preprocess_image(self, image_path: str) -> Optional[np.ndarray]:
